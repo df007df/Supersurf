@@ -37,6 +37,11 @@ export interface PooledConnection {
         resolve: (v: unknown) => void;
         reject: (e: Error) => void;
     }>;
+    /**
+     * When true (default), daemon does not kill this Chromium on last MCP session disconnect.
+     * Idle / shutdown / orphan paths ignore this flag.
+     */
+    keepBrowserOnSessionEnd: boolean;
 }
 /** An agent waiting for a matching extension connection. */
 export interface PendingMatch {
