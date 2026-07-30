@@ -3,9 +3,11 @@
  *
  * Implements `browser_take_screenshot` and `browser_pdf_save`.
  *
- * Screenshots are captured via the extension's CDP Page.captureScreenshot,
- * then optionally downscaled using Sharp to prevent base64 token blowup
- * when returned inline to the agent. File saves bypass downscaling.
+ * Screenshots are captured via the extension's CDP Page.captureScreenshot.
+ * Agent-facing calls always save to disk (explicit `path`, or a temp file under
+ * `$TMPDIR/supersurf-screenshots/`) and return text only — avoiding base64
+ * image blocks that blow up model context. Internal `rawResult` captures with
+ * no path still return inline base64 (used by maybeAppendScreenshot).
  *
  * Supports: format selection, quality, full-page, element crop via selector,
  * coordinate clipping, device scale, and clickable element highlighting.
@@ -15,6 +17,8 @@
 
 import type { ToolContext } from './lib/types';
 import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import sharp from 'sharp';
 import sizeOf from 'image-size';
 import { createLog } from '../logger';
@@ -25,21 +29,35 @@ const log = createLog('[Screenshot]');
 /** Max pixel dimension for screenshots returned as base64 to the agent. */
 const SCREENSHOT_MAX_DIMENSION = 2000;
 
+const DEFAULT_SCREENSHOT_DIR = path.join(os.tmpdir(), 'supersurf-screenshots');
+
+/** Build a unique temp path under `$TMPDIR/supersurf-screenshots/`. */
+export function defaultTempScreenshotPath(format: string = 'jpeg'): string {
+  fs.mkdirSync(DEFAULT_SCREENSHOT_DIR, { recursive: true });
+  const ext = format === 'png' ? 'png' : 'jpg';
+  const name = `screenshot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  return path.join(DEFAULT_SCREENSHOT_DIR, name);
+}
+
 /**
  * Capture a screenshot of the current page or a specific element/region.
  *
  * When saving to a file path, the original resolution is preserved.
- * When returning as base64 (no path), images wider/taller than
- * {@link SCREENSHOT_MAX_DIMENSION} are downscaled with Lanczos3 to
- * keep MCP response sizes reasonable.
+ * Agent-facing calls without `path` default to a temp file (text-only result).
+ * Internal `rawResult` without `path` still returns downscaled base64.
  *
  * @param args - Screenshot options (type, quality, fullPage, path, clip, selector, etc.)
  */
 export async function onScreenshot(ctx: ToolContext, args: any, options: any): Promise<any> {
-  const filePath = args.path as string | undefined;
+  const format = (args.type as string) || 'jpeg';
+  const explicitPath =
+    typeof args.path === 'string' && args.path.trim() ? args.path.trim() : undefined;
+  // Agent-facing: always persist (temp if omitted). Internal rawResult keeps inline.
+  const filePath =
+    explicitPath ?? (options.rawResult ? undefined : defaultTempScreenshotPath(format));
 
   // Build capture params
-  const captureParams: any = { format: args.type || 'jpeg', tabId: ctx.tabId };
+  const captureParams: any = { format, tabId: ctx.tabId };
   if (args.quality) captureParams.quality = args.quality;
   if (args.clip_x !== undefined) {
     captureParams.clip = {
@@ -83,11 +101,12 @@ export async function onScreenshot(ctx: ToolContext, args: any, options: any): P
   }
 
   let buffer = Buffer.from(result.data, 'base64');
-  const format = (args.type as string) || 'jpeg';
 
   // Save to file (no downscaling — file saves keep original resolution)
   if (filePath) {
-    const safePath = sandboxPath(filePath);
+    // Explicit agent paths go through the $HOME sandbox; auto temp paths are trusted.
+    const safePath = explicitPath ? sandboxPath(explicitPath) : filePath;
+    fs.mkdirSync(path.dirname(safePath), { recursive: true });
     fs.writeFileSync(safePath, buffer);
     if (options.rawResult) return { success: true, path: safePath, size: buffer.length };
     return {

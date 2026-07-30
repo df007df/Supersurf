@@ -245,11 +245,11 @@ Returns matched CSS rules with source file/line, computed values, and which rule
 ## Screenshots & PDFs
 
 ```
-browser_take_screenshot                                   → viewport JPEG (default)
+browser_take_screenshot                                   → save viewport JPEG to $TMPDIR (default; text path only)
 browser_take_screenshot fullPage=true                     → entire page
 browser_take_screenshot selector='#chart'                 → crop to element
 browser_take_screenshot highlightClickables=true          → outline clickable elements
-browser_take_screenshot path='/tmp/screenshot.png'        → save to file
+browser_take_screenshot path='Desktop/screenshot.png'     → save under $HOME (explicit path)
 browser_pdf_save path='/tmp/page.pdf'                     → export as PDF
 ```
 

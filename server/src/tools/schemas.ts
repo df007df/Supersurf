@@ -212,14 +212,18 @@ export function getToolSchemas(): ToolSchema[] {
     {
       name: 'browser_take_screenshot',
       description:
-        'Capture a screenshot. Defaults to JPEG quality 80, viewport-only. Options: full page, element crop, coordinate clip, clickable highlights.',
+        'Capture a screenshot and save it to disk (text path only — no inline image). Defaults to JPEG quality 80, viewport-only, temp file under OS tmpdir. Options: full page, element crop, coordinate clip, clickable highlights.',
       inputSchema: {
         type: 'object',
         properties: {
           type: { type: 'string', enum: ['png', 'jpeg'], description: 'Image format (default: jpeg)' },
           fullPage: { type: 'boolean', description: 'Full page (default: false)' },
           quality: { type: 'number', description: 'JPEG quality 0-100 (default: 80)' },
-          path: { type: 'string', description: 'File path to save (returns data if omitted)' },
+          path: {
+            type: 'string',
+            description:
+              'File path to save (relative to $HOME). Default: $TMPDIR/supersurf-screenshots/screenshot-*.jpg — never returns an inline image.',
+          },
           highlightClickables: { type: 'boolean', description: 'Highlight clickable elements (default: false)' },
           deviceScale: { type: 'number', description: 'Scale factor: 1=CSS pixels, 0=native resolution' },
           selector: { type: 'string', description: 'CSS selector for partial screenshot' },
