@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SuperSurf Tab Group Persist — UI Mockup</title>
+  <style>
+    :root {
+      --chrome-bg: #dee1e6;
+      --chrome-tab: #f1f3f4;
+      --chrome-active: #fff;
+      --chrome-text: #202124;
+      --chrome-muted: #5f6368;
+      --page-bg: #f8f9fa;
+      --border: #dadce0;
+      --blue: #8ab4f8;
+      --blue-deep: #1a73e8;
+      --grey: #9aa0a6;
+      --grey-deep: #5f6368;
+      --red-soft: #fce8e6;
+      --green-soft: #e6f4ea;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: #e8eaed;
+      color: var(--chrome-text);
+      padding: 32px 40px 48px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      margin: 0 0 8px;
+      letter-spacing: -0.02em;
+    }
+    .subtitle {
+      margin: 0 0 28px;
+      color: var(--chrome-muted);
+      font-size: 14px;
+      max-width: 920px;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      gap: 24px;
+      max-width: 1040px;
+    }
+
+    .panel {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      box-shadow: 0 1px 2px rgba(60,64,67,.08), 0 2px 8px rgba(60,64,67,.06);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: #fafafa;
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 999px;
+    }
+    .badge.before { background: var(--red-soft); color: #c5221f; }
+    .badge.after-idle { background: #f1f3f4; color: #3c4043; }
+    .badge.after-active { background: var(--green-soft); color: #137333; }
+    .panel-title { font-size: 14px; font-weight: 600; }
+    .panel-note { margin-left: auto; font-size: 12px; color: var(--chrome-muted); }
+
+    /* Fake Chrome window chrome */
+    .window {
+      background: var(--chrome-bg);
+      padding: 8px 8px 0;
+    }
+    .traffic {
+      display: flex;
+      gap: 6px;
+      padding: 2px 6px 8px;
+    }
+    .traffic span {
+      width: 10px; height: 10px; border-radius: 50%;
+      display: inline-block;
+    }
+    .traffic .r { background: #ff5f57; }
+    .traffic .y { background: #febc2e; }
+    .traffic .g { background: #28c840; }
+
+    .tabstrip {
+      display: flex;
+      align-items: flex-end;
+      gap: 0;
+      min-height: 40px;
+      padding: 0 4px;
+      position: relative;
+    }
+
+    .group {
+      display: flex;
+      align-items: flex-end;
+      gap: 0;
+      position: relative;
+      margin-right: 6px;
+      padding: 0 2px 0 0;
+    }
+
+    .group-label {
+      position: absolute;
+      top: -2px;
+      left: 10px;
+      z-index: 2;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 7px 2px;
+      border-radius: 4px;
+      color: #fff;
+      white-space: nowrap;
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      box-shadow: 0 1px 2px rgba(0,0,0,.12);
+    }
+    .group.blue .group-label { background: var(--blue-deep); }
+    .group.grey .group-label { background: var(--grey-deep); }
+
+    .group.blue {
+      background: linear-gradient(180deg, rgba(138,180,248,.35), rgba(138,180,248,.12));
+      border-radius: 10px 10px 0 0;
+      padding-top: 14px;
+      border: 1px solid rgba(26,115,232,.25);
+      border-bottom: none;
+    }
+    .group.grey {
+      background: linear-gradient(180deg, rgba(154,160,166,.32), rgba(154,160,166,.1));
+      border-radius: 10px 10px 0 0;
+      padding-top: 14px;
+      border: 1px solid rgba(95,99,104,.28);
+      border-bottom: none;
+    }
+
+    .tab {
+      height: 34px;
+      min-width: 140px;
+      max-width: 180px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--chrome-tab);
+      border-radius: 8px 8px 0 0;
+      margin-right: 2px;
+      font-size: 12px;
+      color: var(--chrome-text);
+      border: 1px solid transparent;
+      position: relative;
+    }
+    .tab.active {
+      background: var(--chrome-active);
+      box-shadow: 0 -1px 0 #fff;
+    }
+    .tab .favicon {
+      width: 14px; height: 14px; border-radius: 3px;
+      background: linear-gradient(135deg, #4285f4, #34a853);
+      flex-shrink: 0;
+    }
+    .tab .favicon.baidu { background: linear-gradient(135deg, #2932e1, #e10602); }
+    .tab .favicon.doc { background: linear-gradient(135deg, #fbbc04, #ea4335); }
+    .tab .title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+    .tab .x {
+      color: var(--chrome-muted);
+      font-size: 11px;
+      opacity: .7;
+    }
+
+    .loose .tab {
+      opacity: .95;
+    }
+
+    .toolbar {
+      background: var(--chrome-active);
+      border-top: 1px solid var(--border);
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #f1f3f4; color: #9aa0a6;
+      display: grid; place-items: center; font-size: 10px;
+    }
+    .omnibox {
+      flex: 1;
+      background: #f1f3f4;
+      border-radius: 16px;
+      padding: 6px 14px;
+      font-size: 12px;
+      color: var(--chrome-muted);
+    }
+
+    .page {
+      height: 72px;
+      background: var(--page-bg);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 12px;
+      color: var(--chrome-muted);
+      font-size: 13px;
+    }
+    .page strong { color: var(--chrome-text); font-weight: 600; }
+
+    .callout {
+      margin: 0;
+      padding: 10px 16px 14px;
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: #3c4043;
+      background: #fff;
+      border-top: 1px dashed var(--border);
+    }
+    .callout em { font-style: normal; font-weight: 600; color: #1a73e8; }
+    .callout.bad em { color: #c5221f; }
+    .callout.good em { color: #137333; }
+
+    .legend {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--chrome-muted);
+    }
+    .swatch {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot {
+      width: 12px; height: 12px; border-radius: 3px;
+    }
+    .dot.blue { background: var(--blue-deep); }
+    .dot.grey { background: var(--grey-deep); }
+  </style>
+</head>
+<body>
+  <h1>SuperSurf · Tab Group persistence (UI)</h1>
+  <p class="subtitle">
+    MCP turn teardown still disconnects the session. This change keeps the Chrome Tab Group
+    bound to <code>client_id</code>: idle turns show <strong>grey</strong>; the next turn restores the prior active color.
+  </p>
+
+  <div class="grid">
+    <!-- BEFORE -->
+    <section class="panel" id="before">
+      <div class="panel-head">
+        <span class="badge before">Before</span>
+        <span class="panel-title">After MCP disconnect (old behavior)</span>
+        <span class="panel-note">tabs.ungroup → group gone</span>
+      </div>
+      <div class="window">
+        <div class="traffic"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+        <div class="tabstrip loose">
+          <div class="tab active">
+            <span class="favicon baidu"></span>
+            <span class="title">百度一下</span>
+            <span class="x">×</span>
+          </div>
+          <div class="tab">
+            <span class="favicon doc"></span>
+            <span class="title">docs.example</span>
+            <span class="x">×</span>
+          </div>
+          <div class="tab">
+            <span class="favicon"></span>
+            <span class="title">New Tab</span>
+            <span class="x">×</span>
+          </div>
+        </div>
+        <div class="toolbar">
+          <span class="nav">←</span><span class="nav">→</span><span class="nav">↻</span>
+          <div class="omnibox">https://www.baidu.com/</div>
+        </div>
+        <div class="page">Pages remain open, but <strong>no Tab Group</strong> — next turn creates a new colored group.</div>
+      </div>
+      <p class="callout bad">Result: same <code>client_id</code> reconnects → <em>new group + new rotating color</em>. Visual continuity lost.</p>
+    </section>
+
+    <!-- AFTER IDLE -->
+    <section class="panel" id="after-idle">
+      <div class="panel-head">
+        <span class="badge after-idle">After · Idle</span>
+        <span class="panel-title">After MCP disconnect (this PR)</span>
+        <span class="panel-note">keep group · color → grey</span>
+      </div>
+      <div class="window">
+        <div class="traffic"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+        <div class="tabstrip">
+          <div class="group grey">
+            <span class="group-label">lingoway-wp-6a288</span>
+            <div class="tab active">
+              <span class="favicon baidu"></span>
+              <span class="title">百度一下</span>
+              <span class="x">×</span>
+            </div>
+            <div class="tab">
+              <span class="favicon doc"></span>
+              <span class="title">docs.example</span>
+              <span class="x">×</span>
+            </div>
+          </div>
+          <div class="tab">
+            <span class="favicon"></span>
+            <span class="title">New Tab</span>
+            <span class="x">×</span>
+          </div>
+        </div>
+        <div class="toolbar">
+          <span class="nav">←</span><span class="nav">→</span><span class="nav">↻</span>
+          <div class="omnibox">https://www.baidu.com/</div>
+        </div>
+        <div class="page">Group titled with <strong>client_id</strong> stays; <strong>grey</strong> = session idle between turns.</div>
+      </div>
+      <p class="callout good">Result: tabs stay owned by the session group. Color store keeps the prior active color (e.g. blue).</p>
+    </section>
+
+    <!-- AFTER ACTIVE -->
+    <section class="panel" id="after-active">
+      <div class="panel-head">
+        <span class="badge after-active">After · Active</span>
+        <span class="panel-title">Next turn reconnect + tab op</span>
+        <span class="panel-note">reclaim by title · restore color</span>
+      </div>
+      <div class="window">
+        <div class="traffic"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+        <div class="tabstrip">
+          <div class="group blue">
+            <span class="group-label">lingoway-wp-6a288</span>
+            <div class="tab active">
+              <span class="favicon baidu"></span>
+              <span class="title">百度一下</span>
+              <span class="x">×</span>
+            </div>
+            <div class="tab">
+              <span class="favicon doc"></span>
+              <span class="title">docs.example</span>
+              <span class="x">×</span>
+            </div>
+          </div>
+          <div class="tab">
+            <span class="favicon"></span>
+            <span class="title">New Tab</span>
+            <span class="x">×</span>
+          </div>
+        </div>
+        <div class="toolbar">
+          <span class="nav">←</span><span class="nav">→</span><span class="nav">↻</span>
+          <div class="omnibox">https://www.baidu.com/</div>
+        </div>
+        <div class="page">Same group reclaimed; <strong>blue</strong> (stored active color) restored from <code>chrome.storage.local</code>.</div>
+      </div>
+      <p class="callout good">Result: <em>same title + same color</em> across MCP turn teardown — only grey marks the idle gap.</p>
+    </section>
+  </div>
+
+  <div class="legend">
+    <span class="swatch"><span class="dot blue"></span> Active session color (palette; never grey)</span>
+    <span class="swatch"><span class="dot grey"></span> Idle after disconnect</span>
+    <span class="swatch">Group title = <code>client_id</code></span>
+  </div>
+</body>
+</html>
