@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { RequestScheduler } from '../src/scheduler';
+import { RequestScheduler, TAB_SCOPED_METHODS } from '../src/scheduler';
 import { SessionRegistry } from '../src/session';
 import type { ExtensionBridge } from '../src/extension-bridge';
 import net from 'net';
@@ -197,6 +197,41 @@ describe('RequestScheduler', () => {
       const result = await scheduler.enqueue('s1', 'getTabs', {});
       expect(result.tabs).toHaveLength(2);
       expect(result.tabs.map((t: any) => t.id)).toEqual([10, 30]);
+    });
+  });
+
+  describe('tab-scoped stream methods', () => {
+    it('includes browseStreamStart and browseStreamOffer in TAB_SCOPED_METHODS', () => {
+      expect(TAB_SCOPED_METHODS.has('browseStreamStart')).toBe(true);
+      expect(TAB_SCOPED_METHODS.has('browseStreamOffer')).toBe(true);
+      expect(TAB_SCOPED_METHODS.has('browseStreamStop')).toBe(false);
+    });
+
+    it('context-switches before browseStreamStart when attached tab differs', async () => {
+      sessions.add('s1', mockSocket());
+      scheduler.addSession('s1');
+
+      (bridge.sendCmd as any).mockResolvedValueOnce({ attachedTab: { id: 10, groupId: 1 } });
+      await scheduler.enqueue('s1', 'selectTab', { tabId: 10 });
+
+      sessions.setAttachedTabId('s1', 42);
+
+      (bridge.sendCmd as any)
+        .mockResolvedValueOnce({ success: true })
+        .mockResolvedValueOnce({ streamId: 'stream-1' });
+
+      await scheduler.enqueue('s1', 'browseStreamStart', {});
+
+      expect(bridge.sendCmd).toHaveBeenCalledWith(
+        'selectTab',
+        expect.objectContaining({ tabId: 42, _sessionId: 's1' }),
+        5000,
+      );
+      expect(bridge.sendCmd).toHaveBeenCalledWith(
+        'browseStreamStart',
+        expect.objectContaining({ _sessionId: 's1' }),
+        30000,
+      );
     });
   });
 

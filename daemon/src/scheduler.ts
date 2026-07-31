@@ -24,12 +24,13 @@ const TAB_CLAIM_METHODS = new Set(['selectTab', 'createTab']);
 const TAB_RELEASE_METHODS = new Set(['closeTab']);
 
 // Methods where we need to ensure the correct tab is active before executing
-const TAB_SCOPED_METHODS = new Set([
+export const TAB_SCOPED_METHODS = new Set([
   'navigate', 'snapshot', 'evaluate', 'screenshot',
   'consoleMessages', 'networkRequests', 'clearNetwork',
   'performanceMetrics', 'waitForReady', 'capturePageState',
   'forwardCDPCommand', 'window', 'dialog',
   'listExtensions', 'secure_fill',
+  'browseStreamStart', 'browseStreamOffer',
 ]);
 
 /**
