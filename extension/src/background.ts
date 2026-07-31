@@ -33,6 +33,14 @@ import { SessionContext } from './session-context.js';
 import { DomainWhitelist } from './domain-whitelist.js';
 import { applyProfileRegister } from './handlers/profile-register.js';
 import { isLivePreviewStreamActive } from './handlers/stream/live-preview-active.js';
+import { StreamSession } from './handlers/stream/session.js';
+import { registerStreamHandlers } from './handlers/stream/register.js';
+import {
+  answerOfferInOffscreen,
+  captureTabInOffscreen,
+  ensureOffscreenDocument,
+  teardownOffscreenCapture,
+} from './handlers/stream/offscreen-bridge.js';
 
 // chrome.debugger is a reserved word — access via bracket notation
 const chromeDebugger = (chrome as any)['debugger'] as ChromeDebugger;
@@ -40,6 +48,7 @@ const chromeDebugger = (chrome as any)['debugger'] as ChromeDebugger;
 // Top-level variables
 let tabHandlers: TabHandlers;
 let wsConnection: WebSocketConnection;
+let streamSession: StreamSession | null = null;
 
 // Register lifecycle listeners at TOP LEVEL for MV3 activation guarantee.
 // These ensure the service worker activates on first install/sideload and on
@@ -65,6 +74,13 @@ chrome.tabs.onCreated.addListener((tab) => {
   const cutoff = Date.now() - SPAWNED_TAB_TTL;
   while (spawnedTabBuffer.length > 0 && spawnedTabBuffer[0].timestamp < cutoff) {
     spawnedTabBuffer.shift();
+  }
+});
+
+// Stop live preview when the streamed tab is closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (streamSession?.isActive() && streamSession.activeTabId === tabId) {
+    void streamSession.stop();
   }
 });
 
@@ -235,6 +251,9 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
       dialogHandler.clearPending();
       sessionContext.dialogPending = false;
       logger.log('[Background] Debugger detached');
+    }
+    if (streamSession?.isActive() && streamSession.activeTabId === source.tabId) {
+      void streamSession.stop();
     }
   });
 
@@ -688,6 +707,18 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   ExperimentalFeatures.registerHandlers(wsConnection, tabHandlers, networkTracker, sessionContext);
   registerMouseHandlers(wsConnection, sessionContext, cdp);
   registerSecureEvalHandlers(wsConnection);
+
+  // ── Live preview stream (tabCapture → Offscreen composite → WebRTC) ──
+  streamSession = new StreamSession({
+    ensureOffscreen: ensureOffscreenDocument,
+    captureTab: captureTabInOffscreen,
+    answerOffer: (params) => answerOfferInOffscreen(params),
+    teardown: teardownOffscreenCapture,
+  });
+  registerStreamHandlers(wsConnection, {
+    session: streamSession,
+    ensureTab: (tabId) => tabHandlers.ensureAttachedTab(tabId),
+  });
 
   // ── Popup message handler ──
   // Handles messages from the extension popup UI (enable/disable, status queries,

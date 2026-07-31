@@ -30,11 +30,16 @@ import { registerSecureEvalHandlers } from './security/secure-eval/index.js';
 import { SessionContext } from './session-context.js';
 import { DomainWhitelist } from './domain-whitelist.js';
 import { applyProfileRegister } from './handlers/profile-register.js';
+import { isLivePreviewStreamActive } from './handlers/stream/live-preview-active.js';
+import { StreamSession } from './handlers/stream/session.js';
+import { registerStreamHandlers } from './handlers/stream/register.js';
+import { answerOfferInOffscreen, captureTabInOffscreen, ensureOffscreenDocument, teardownOffscreenCapture, } from './handlers/stream/offscreen-bridge.js';
 // chrome.debugger is a reserved word — access via bracket notation
 const chromeDebugger = chrome['debugger'];
 // Top-level variables
 let tabHandlers;
 let wsConnection;
+let streamSession = null;
 // Register lifecycle listeners at TOP LEVEL for MV3 activation guarantee.
 // These ensure the service worker activates on first install/sideload and on
 // every Chrome launch — without them, the SW may never wake up to establish
@@ -57,6 +62,12 @@ chrome.tabs.onCreated.addListener((tab) => {
     const cutoff = Date.now() - SPAWNED_TAB_TTL;
     while (spawnedTabBuffer.length > 0 && spawnedTabBuffer[0].timestamp < cutoff) {
         spawnedTabBuffer.shift();
+    }
+});
+// Stop live preview when the streamed tab is closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+    if (streamSession?.isActive() && streamSession.activeTabId === tabId) {
+        void streamSession.stop();
     }
 });
 // Register tabs.onUpdated at TOP LEVEL for MV3 persistence
@@ -225,6 +236,9 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
             sessionContext.dialogPending = false;
             logger.log('[Background] Debugger detached');
         }
+        if (streamSession?.isActive() && streamSession.activeTabId === source.tabId) {
+            void streamSession.stop();
+        }
     });
     // Listen for tech stack info and profile registration from content script
     chrome.runtime.onMessage.addListener((message, sender) => {
@@ -236,6 +250,20 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
         // so a sole registration tab does not quit Chromium mid-connect.
         if (message.type === 'profileRegister' && message.profile) {
             void applyProfileRegister(message.profile, sender.tab?.id, chrome.storage, chrome.tabs);
+        }
+        if (message.type === 'livePreviewMouse') {
+            if (!isLivePreviewStreamActive())
+                return;
+            // Content script omits tabId; ignore re-delivered forwards.
+            if (message.tabId !== undefined)
+                return;
+            void chrome.runtime.sendMessage({
+                type: 'livePreviewMouse',
+                tabId: sender.tab?.id,
+                kind: message.kind,
+                x: message.x,
+                y: message.y,
+            });
         }
     });
     // When a profile is registered in storage, reconnect to the daemon.
@@ -612,6 +640,17 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
     ExperimentalFeatures.registerHandlers(wsConnection, tabHandlers, networkTracker, sessionContext);
     registerMouseHandlers(wsConnection, sessionContext, cdp);
     registerSecureEvalHandlers(wsConnection);
+    // ── Live preview stream (tabCapture → Offscreen composite → WebRTC) ──
+    streamSession = new StreamSession({
+        ensureOffscreen: ensureOffscreenDocument,
+        captureTab: captureTabInOffscreen,
+        answerOffer: (params) => answerOfferInOffscreen(params),
+        teardown: teardownOffscreenCapture,
+    });
+    registerStreamHandlers(wsConnection, {
+        session: streamSession,
+        ensureTab: (tabId) => tabHandlers.ensureAttachedTab(tabId),
+    });
     // ── Popup message handler ──
     // Handles messages from the extension popup UI (enable/disable, status queries,
     // whitelist toggling). Each handler returns true to indicate async sendResponse.

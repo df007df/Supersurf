@@ -226,4 +226,34 @@ declare namespace chrome {
       addListener(callback: (alarm: { name: string }) => void): void;
     };
   }
+
+  namespace tabCapture {
+    function getMediaStreamId(options: { targetTabId?: number; consumerTabId?: number }): Promise<string>;
+  }
+
+  namespace offscreen {
+    type Reason =
+      | 'TESTING'
+      | 'AUDIO_PLAYBACK'
+      | 'IFRAME_SCRIPTING'
+      | 'DOM_SCRAPING'
+      | 'BLOBS'
+      | 'DOM_PARSER'
+      | 'USER_MEDIA'
+      | 'DISPLAY_MEDIA'
+      | 'WEB_RTC'
+      | 'CLIPBOARD'
+      | 'LOCAL_STORAGE'
+      | 'WORKERS'
+      | 'BATTERY_STATUS'
+      | 'MATCH_MEDIA'
+      | 'GEOLOCATION';
+    function createDocument(parameters: {
+      url: string;
+      reasons: Reason[];
+      justification: string;
+    }): Promise<void>;
+    function closeDocument(): Promise<void>;
+    function hasDocument(): Promise<boolean>;
+  }
 }
