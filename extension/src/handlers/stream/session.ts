@@ -12,12 +12,15 @@ export type StreamSessionDeps = {
 
 /**
  * Single-flight live-preview stream session.
+ * Overlapping start/stop RPCs serialize on a private queue.
  * Duplicate start → stop then start. Concurrent streams: one at a time.
  */
 export class StreamSession {
   private active = false
   private tabId: number | null = null
   private stream: unknown = null
+  /** Serializes overlapping start/stop so both cannot observe idle and capture. */
+  private queue: Promise<unknown> = Promise.resolve()
 
   constructor(private readonly deps: StreamSessionDeps) {}
 
@@ -29,34 +32,50 @@ export class StreamSession {
     return this.active
   }
 
-  async start(params: { tabId: number }): Promise<{ ok: true; tabId: number }> {
-    if (this.active) {
-      await this.stop()
-    }
-
-    await this.deps.ensureOffscreen()
-    const captured = await this.deps.captureTab(params.tabId)
-    this.stream = captured.stream
-    this.tabId = params.tabId
-    this.active = true
-    setLivePreviewStreamActive(true)
-    return { ok: true, tabId: params.tabId }
+  private enqueue<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(fn, fn)
+    this.queue = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    return run
   }
 
-  async stop(): Promise<{ ok: true }> {
-    if (!this.active) {
-      return { ok: true }
-    }
-
+  /**
+   * Always teardown Offscreen (closeDocument) even when in-memory session is idle.
+   * Required after SW restart when Offscreen/tabCapture may still be alive.
+   */
+  private async stopUnlocked(): Promise<{ ok: true }> {
     try {
       await this.deps.teardown()
     } finally {
       this.active = false
       this.tabId = null
       this.stream = null
-      setLivePreviewStreamActive(false)
+      await setLivePreviewStreamActive(false)
     }
     return { ok: true }
+  }
+
+  private async startUnlocked(params: { tabId: number }): Promise<{ ok: true; tabId: number }> {
+    // Always close any prior / orphaned Offscreen before creating a new session.
+    await this.stopUnlocked()
+
+    await this.deps.ensureOffscreen()
+    const captured = await this.deps.captureTab(params.tabId)
+    this.stream = captured.stream
+    this.tabId = params.tabId
+    this.active = true
+    await setLivePreviewStreamActive(true)
+    return { ok: true, tabId: params.tabId }
+  }
+
+  async start(params: { tabId: number }): Promise<{ ok: true; tabId: number }> {
+    return this.enqueue(() => this.startUnlocked(params))
+  }
+
+  async stop(): Promise<{ ok: true }> {
+    return this.enqueue(() => this.stopUnlocked())
   }
 
   async acceptOffer(params: {

@@ -1,4 +1,5 @@
 import { applyMouseDown, applyMouseMove, drawCursorOverlay, pruneRipples, } from './cursor-overlay.js';
+import { scaleCssPointToCapture } from './cursor-scale.js';
 const TARGET_FPS = 30;
 /**
  * Bind a tab MediaStream to a hidden video + canvas compositor.
@@ -72,13 +73,31 @@ export async function startCompositing(handle) {
     }
     return handle.compositeStream;
 }
-export function applyCompositorMouse(handle, kind, x, y) {
+/**
+ * Apply mouse in CSS viewport coords, scaled onto the capture canvas.
+ * Prefer explicit cssWidth/Height from the page (video may be display:none → clientWidth 0).
+ * Fallback: canvas.width / video.clientWidth when the video element is laid out.
+ */
+export function applyCompositorMouse(handle, kind, x, y, cssWidth, cssHeight) {
+    resizeCanvasToVideo(handle);
+    const { video, canvas } = handle;
+    const vw = cssWidth && cssWidth > 0
+        ? cssWidth
+        : video.clientWidth > 0
+            ? video.clientWidth
+            : canvas.width;
+    const vh = cssHeight && cssHeight > 0
+        ? cssHeight
+        : video.clientHeight > 0
+            ? video.clientHeight
+            : canvas.height;
+    const scaled = scaleCssPointToCapture(x, y, vw, vh, canvas.width, canvas.height);
     const now = performance.now();
     if (kind === 'move') {
-        applyMouseMove(handle, x, y, now);
+        applyMouseMove(handle, scaled.x, scaled.y, now);
     }
     else {
-        applyMouseDown(handle, x, y, now);
+        applyMouseDown(handle, scaled.x, scaled.y, now);
     }
 }
 export function stopCompositing(handle) {

@@ -32,7 +32,10 @@ import { registerSecureEvalHandlers } from './security/secure-eval/index.js';
 import { SessionContext } from './session-context.js';
 import { DomainWhitelist } from './domain-whitelist.js';
 import { applyProfileRegister } from './handlers/profile-register.js';
-import { isLivePreviewStreamActive } from './handlers/stream/live-preview-active.js';
+import {
+  isLivePreviewStreamActive,
+  rehydrateLivePreviewStreamActive,
+} from './handlers/stream/live-preview-active.js';
 import { StreamSession } from './handlers/stream/session.js';
 import { registerStreamHandlers } from './handlers/stream/register.js';
 import {
@@ -280,6 +283,8 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
         kind: message.kind,
         x: message.x,
         y: message.y,
+        cssWidth: message.cssWidth,
+        cssHeight: message.cssHeight,
       });
     }
   });
@@ -719,6 +724,25 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
     session: streamSession,
     ensureTab: (tabId) => tabHandlers.ensureAttachedTab(tabId),
   });
+
+  // SW restart can leave Offscreen/tabCapture alive while in-memory session is idle.
+  // Rehydrate the session flag and close any orphaned live-preview document.
+  void (async () => {
+    const flagged = await rehydrateLivePreviewStreamActive();
+    let hasDoc = false;
+    try {
+      hasDoc =
+        typeof chrome.offscreen?.hasDocument === 'function'
+          ? await chrome.offscreen.hasDocument()
+          : false;
+    } catch {
+      hasDoc = false;
+    }
+    if (flagged || hasDoc) {
+      // stop() always teardowns Offscreen even when in-memory session is inactive
+      await streamSession?.stop();
+    }
+  })();
 
   // ── Popup message handler ──
   // Handles messages from the extension popup UI (enable/disable, status queries,

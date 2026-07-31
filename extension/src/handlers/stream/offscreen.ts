@@ -84,7 +84,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // Cursor optional: missing content-script → stream still works without cursor
     if (compositor && message.tabId === activeTabId) {
       const kind = message.kind === 'down' ? 'down' : 'move'
-      applyCompositorMouse(compositor, kind, Number(message.x) || 0, Number(message.y) || 0)
+      const cssWidth = Number(message.cssWidth)
+      const cssHeight = Number(message.cssHeight)
+      applyCompositorMouse(
+        compositor,
+        kind,
+        Number(message.x) || 0,
+        Number(message.y) || 0,
+        Number.isFinite(cssWidth) && cssWidth > 0 ? cssWidth : undefined,
+        Number.isFinite(cssHeight) && cssHeight > 0 ? cssHeight : undefined,
+      )
     }
     return false
   }

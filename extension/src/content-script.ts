@@ -188,7 +188,15 @@ if (document.readyState === 'loading') {
 function sendMouse(kind: 'move' | 'down', ev: MouseEvent) {
   const x = ev.clientX;
   const y = ev.clientY;
-  void chrome.runtime.sendMessage({ type: 'livePreviewMouse', kind, x, y });
+  // Include CSS viewport size so Offscreen can scale onto tabCapture (DPR/retina).
+  void chrome.runtime.sendMessage({
+    type: 'livePreviewMouse',
+    kind,
+    x,
+    y,
+    cssWidth: window.innerWidth,
+    cssHeight: window.innerHeight,
+  });
 }
 
 window.addEventListener('mousemove', (ev) => sendMouse('move', ev), { passive: true });
