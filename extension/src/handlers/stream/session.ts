@@ -62,12 +62,22 @@ export class StreamSession {
     await this.stopUnlocked()
 
     await this.deps.ensureOffscreen()
-    const captured = await this.deps.captureTab(params.tabId)
-    this.stream = captured.stream
-    this.tabId = params.tabId
-    this.active = true
-    await setLivePreviewStreamActive(true)
-    return { ok: true, tabId: params.tabId }
+    try {
+      const captured = await this.deps.captureTab(params.tabId)
+      this.stream = captured.stream
+      this.tabId = params.tabId
+      this.active = true
+      await setLivePreviewStreamActive(true)
+      return { ok: true, tabId: params.tabId }
+    } catch (err) {
+      // captureTab can fail after ensureOffscreen (e.g. chrome://) — don't leak Offscreen.
+      await this.deps.teardown()
+      this.active = false
+      this.tabId = null
+      this.stream = null
+      await setLivePreviewStreamActive(false)
+      throw err
+    }
   }
 
   async start(params: { tabId: number }): Promise<{ ok: true; tabId: number }> {
@@ -78,7 +88,7 @@ export class StreamSession {
     return this.enqueue(() => this.stopUnlocked())
   }
 
-  async acceptOffer(params: {
+  private async acceptOfferUnlocked(params: {
     sdp: string
     type: 'offer'
   }): Promise<{ sdp: string; type: 'answer' }> {
@@ -86,5 +96,12 @@ export class StreamSession {
       throw new Error('No active live preview stream. Call browseStreamStart first.')
     }
     return this.deps.answerOffer(params, this.stream)
+  }
+
+  async acceptOffer(params: {
+    sdp: string
+    type: 'offer'
+  }): Promise<{ sdp: string; type: 'answer' }> {
+    return this.enqueue(() => this.acceptOfferUnlocked(params))
   }
 }

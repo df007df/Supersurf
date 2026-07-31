@@ -100,4 +100,43 @@ describe('StreamSession', () => {
     await s.stop()
     expect(teardown).toHaveBeenCalledTimes(1)
   })
+
+  it('acceptOffer joins the session queue and fails cleanly if stopped before dequeue', async () => {
+    const answerOffer = vi.fn().mockResolvedValue({ sdp: 'a', type: 'answer' })
+    const s = new StreamSession({
+      ensureOffscreen: vi.fn(),
+      captureTab: vi.fn().mockResolvedValue({ stream: { id: 1 } }),
+      answerOffer,
+      teardown: vi.fn(),
+    })
+
+    await s.start({ tabId: 1 })
+    expect(s.isActive()).toBe(true)
+
+    // Enqueue stop before offer so offer observes inactive after dequeue.
+    const stopP = s.stop()
+    const offerP = s.acceptOffer({ sdp: 'o', type: 'offer' })
+
+    await expect(stopP).resolves.toEqual({ ok: true })
+    await expect(offerP).rejects.toThrow(/No active live preview stream/)
+    expect(answerOffer).not.toHaveBeenCalled()
+  })
+
+  it('tears down Offscreen when captureTab fails after ensureOffscreen', async () => {
+    const ensureOffscreen = vi.fn()
+    const teardown = vi.fn()
+    const s = new StreamSession({
+      ensureOffscreen,
+      captureTab: vi.fn().mockRejectedValue(new Error('cannot capture chrome://')),
+      answerOffer: vi.fn(),
+      teardown,
+    })
+
+    await expect(s.start({ tabId: 1 })).rejects.toThrow(/cannot capture/)
+    expect(ensureOffscreen).toHaveBeenCalled()
+    // stopUnlocked (pre-start) + failure path teardown
+    expect(teardown).toHaveBeenCalled()
+    expect(s.isActive()).toBe(false)
+    expect(isLivePreviewStreamActive()).toBe(false)
+  })
 })
