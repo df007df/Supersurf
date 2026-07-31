@@ -1,3 +1,5 @@
+import { cssPointFromMouseEvent } from './handlers/stream/mouse-bridge.js';
+
 /**
  * Content script — tech stack detection + console message relay.
  *
@@ -184,3 +186,11 @@ if (document.readyState === 'loading') {
     chrome.runtime.sendMessage({ type: 'techStack', data: techStack });
   }, 1000);
 }
+
+function sendMouse(kind: 'move' | 'down', ev: MouseEvent) {
+  const { x, y } = cssPointFromMouseEvent(ev);
+  void chrome.runtime.sendMessage({ type: 'livePreviewMouse', kind, x, y });
+}
+
+window.addEventListener('mousemove', (ev) => sendMouse('move', ev), { passive: true });
+window.addEventListener('mousedown', (ev) => sendMouse('down', ev), { passive: true });

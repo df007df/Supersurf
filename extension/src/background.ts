@@ -32,6 +32,7 @@ import { registerSecureEvalHandlers } from './security/secure-eval/index.js';
 import { SessionContext } from './session-context.js';
 import { DomainWhitelist } from './domain-whitelist.js';
 import { applyProfileRegister } from './handlers/profile-register.js';
+import { isLivePreviewStreamActive } from './handlers/stream/live-preview-active.js';
 
 // chrome.debugger is a reserved word — access via bracket notation
 const chromeDebugger = (chrome as any)['debugger'] as ChromeDebugger;
@@ -248,6 +249,19 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
     // so a sole registration tab does not quit Chromium mid-connect.
     if (message.type === 'profileRegister' && message.profile) {
       void applyProfileRegister(message.profile, sender.tab?.id, chrome.storage, chrome.tabs);
+    }
+
+    if (message.type === 'livePreviewMouse') {
+      if (!isLivePreviewStreamActive()) return;
+      // Content script omits tabId; ignore re-delivered forwards.
+      if (message.tabId !== undefined) return;
+      void chrome.runtime.sendMessage({
+        type: 'livePreviewMouse',
+        tabId: sender.tab?.id,
+        kind: message.kind,
+        x: message.x,
+        y: message.y,
+      });
     }
   });
 
