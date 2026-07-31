@@ -16,7 +16,8 @@ export type CompositorHandle = {
   ctx: CanvasRenderingContext2D
   cursor: CursorPoint | null
   ripples: Ripple[]
-  rafId: number | null
+  /** Timer id for paint loop (Offscreen docs throttle rAF → black captureStream). */
+  loopId: ReturnType<typeof setInterval> | null
   compositeStream: MediaStream | null
   tabStream: MediaStream | null
 }
@@ -45,7 +46,7 @@ export function createCompositor(
     ctx,
     cursor: null,
     ripples: [],
-    rafId: null,
+    loopId: null,
     compositeStream: null,
     tabStream,
   }
@@ -70,9 +71,14 @@ function paintFrame(handle: CompositorHandle): void {
   drawCursorOverlay(ctx, handle.cursor, handle.ripples, now)
 }
 
-function loop(handle: CompositorHandle): void {
+/**
+ * Paint via setInterval — chrome.offscreen does not schedule requestAnimationFrame
+ * (no visible page), so rAF-driven canvas.captureStream stays black forever.
+ */
+function startPaintLoop(handle: CompositorHandle): void {
+  if (handle.loopId != null) return
   paintFrame(handle)
-  handle.rafId = requestAnimationFrame(() => loop(handle))
+  handle.loopId = setInterval(() => paintFrame(handle), Math.round(1000 / TARGET_FPS))
 }
 
 /** Start the composite loop and return canvas.captureStream at ~30fps. */
@@ -96,9 +102,7 @@ export async function startCompositing(handle: CompositorHandle): Promise<MediaS
   }
 
   resizeCanvasToVideo(handle)
-  if (handle.rafId == null) {
-    loop(handle)
-  }
+  startPaintLoop(handle)
 
   if (!handle.compositeStream) {
     handle.compositeStream = handle.canvas.captureStream(TARGET_FPS)
@@ -143,9 +147,9 @@ export function applyCompositorMouse(
 }
 
 export function stopCompositing(handle: CompositorHandle): void {
-  if (handle.rafId != null) {
-    cancelAnimationFrame(handle.rafId)
-    handle.rafId = null
+  if (handle.loopId != null) {
+    clearInterval(handle.loopId)
+    handle.loopId = null
   }
   if (handle.compositeStream) {
     for (const track of handle.compositeStream.getTracks()) {

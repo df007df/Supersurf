@@ -19,7 +19,7 @@ export function createCompositor(tabStream, video, canvas) {
         ctx,
         cursor: null,
         ripples: [],
-        rafId: null,
+        loopId: null,
         compositeStream: null,
         tabStream,
     };
@@ -41,9 +41,15 @@ function paintFrame(handle) {
     handle.ripples = pruneRipples(handle.ripples, now);
     drawCursorOverlay(ctx, handle.cursor, handle.ripples, now);
 }
-function loop(handle) {
+/**
+ * Paint via setInterval — chrome.offscreen does not schedule requestAnimationFrame
+ * (no visible page), so rAF-driven canvas.captureStream stays black forever.
+ */
+function startPaintLoop(handle) {
+    if (handle.loopId != null)
+        return;
     paintFrame(handle);
-    handle.rafId = requestAnimationFrame(() => loop(handle));
+    handle.loopId = setInterval(() => paintFrame(handle), Math.round(1000 / TARGET_FPS));
 }
 /** Start the composite loop and return canvas.captureStream at ~30fps. */
 export async function startCompositing(handle) {
@@ -65,9 +71,7 @@ export async function startCompositing(handle) {
         });
     }
     resizeCanvasToVideo(handle);
-    if (handle.rafId == null) {
-        loop(handle);
-    }
+    startPaintLoop(handle);
     if (!handle.compositeStream) {
         handle.compositeStream = handle.canvas.captureStream(TARGET_FPS);
     }
@@ -101,9 +105,9 @@ export function applyCompositorMouse(handle, kind, x, y, cssWidth, cssHeight) {
     }
 }
 export function stopCompositing(handle) {
-    if (handle.rafId != null) {
-        cancelAnimationFrame(handle.rafId);
-        handle.rafId = null;
+    if (handle.loopId != null) {
+        clearInterval(handle.loopId);
+        handle.loopId = null;
     }
     if (handle.compositeStream) {
         for (const track of handle.compositeStream.getTracks()) {
