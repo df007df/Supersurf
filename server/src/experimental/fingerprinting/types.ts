@@ -26,7 +26,6 @@ export interface FingerprintRecord extends Fingerprint {
   // TS type-check, since it's required there, and at runtime by overwriting that signal).
   handleName?: string;   // canonical handle name (snake_case), first-seen wins
   purpose?: string;      // latest agent-supplied intent, trimmed
-  aliases?: Record<string, number>; // other names this element was labeled with -> frequency
 }
 
 export interface DomainStore {
@@ -35,9 +34,22 @@ export interface DomainStore {
 }
 
 // Best in-page candidate match returned by the scorer (pre-threshold).
+// Carries the winner's identity, not just its coordinates: a caller that heals a
+// selector miss needs to know WHICH element won so it can synthesize a usable
+// selector (see selector-synthesis.ts). Coordinates alone are useless to the 14
+// action sites that need a selector string or a live CDP objectId.
 export interface ScoreHit {
   cx: number;
   cy: number;
   score: number;
   margin: number;
+  // ── winner identity (mirrors the same-named fields on Fingerprint) ──
+  role: string;
+  name: string;
+  tag: string;
+  type: string | null;
+  htmlId: string;
+  attrs: Record<string, string>;
+  classList: string[];
+  ordinal: number;
 }
