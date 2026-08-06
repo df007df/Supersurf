@@ -9,6 +9,7 @@
  */
 import type { ExtensionBridge } from './extension-bridge';
 import type { SessionRegistry } from './session';
+export declare const TAB_SCOPED_METHODS: Set<string>;
 /**
  * Round-robin request scheduler with tab ownership and auto context-switching.
  */

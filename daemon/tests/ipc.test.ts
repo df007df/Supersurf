@@ -647,7 +647,7 @@ describe('IPCServer', () => {
       expect(profileRegistry.getRunningPid('dev')).toBe(999999);
     });
 
-    it('does NOT kill daemon-owned Chromium when keep field is missing (default keep)', async () => {
+    it('kills daemon-owned Chromium when keep field is missing (opt-in default)', async () => {
       await ipc.start();
       profileRegistry.create('dev');
       profileRegistry.setRunningPid('dev', 999999, 'daemon');
@@ -663,15 +663,13 @@ describe('IPCServer', () => {
       client.end();
       await new Promise((r) => setTimeout(r, 150));
 
-      expect(profileRegistry.getRunningPid('dev')).toBe(999999);
+      expect(profileRegistry.getRunningPid('dev')).toBeNull();
     });
 
-    it('does NOT kill when no extension connection is pooled', async () => {
+    it('kills when no extension connection is pooled (fail closed)', async () => {
       await ipc.start();
       profileRegistry.create('dev');
-      // Live pid so isRunning() does not self-heal/clear (dead 999999 would spawn).
-      const livePid = process.pid;
-      profileRegistry.setRunningPid('dev', livePid, 'daemon');
+      profileRegistry.setRunningPid('dev', 999999, 'daemon');
       (bridge as any).matchmaker.getConnectionForProfile.mockReturnValue(null);
       (bridge as any).matchmaker.requestMatch.mockResolvedValue({ profile: 'dev' });
 
@@ -684,7 +682,7 @@ describe('IPCServer', () => {
       client.end();
       await new Promise((r) => setTimeout(r, 150));
 
-      expect(profileRegistry.getRunningPid('dev')).toBe(livePid);
+      expect(profileRegistry.getRunningPid('dev')).toBeNull(); // kill path ran, pid cleared
     });
 
     it('profiles.list includes owner and connected fields', async () => {

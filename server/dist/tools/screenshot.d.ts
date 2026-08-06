@@ -3,14 +3,13 @@
  *
  * Implements `browser_take_screenshot` and `browser_pdf_save`.
  *
- * Screenshots are captured via the extension's CDP Page.captureScreenshot.
- * Agent-facing calls always save to disk (explicit `path`, or a temp file under
- * `$TMPDIR/supersurf-screenshots/`) and return text only — avoiding base64
- * image blocks that blow up model context. Internal `rawResult` captures with
- * no path still return inline base64 (used by maybeAppendScreenshot).
+ * Screenshots are captured via the extension's CDP Page.captureScreenshot,
+ * then optionally downscaled using Sharp to prevent base64 token blowup
+ * when returned inline to the agent. File saves bypass downscaling.
  *
- * Supports: format selection, quality, full-page, element crop via selector,
- * coordinate clipping, device scale, and clickable element highlighting.
+ * When `path` is omitted, behavior follows `config.screenshot.omit_path`
+ * (`inline` | `path` | `both`; default `inline`). Explicit `path` always
+ * saves to that file. Internal `rawResult` captures without `path` stay inline.
  *
  * @module tools/screenshot
  */
@@ -21,8 +20,9 @@ export declare function defaultTempScreenshotPath(format?: string): string;
  * Capture a screenshot of the current page or a specific element/region.
  *
  * When saving to a file path, the original resolution is preserved.
- * Agent-facing calls without `path` default to a temp file (text-only result).
- * Internal `rawResult` without `path` still returns downscaled base64.
+ * When returning as base64 (no path / inline mode), images wider/taller than
+ * {@link SCREENSHOT_MAX_DIMENSION} are downscaled with Lanczos3 to
+ * keep MCP response sizes reasonable.
  *
  * @param args - Screenshot options (type, quality, fullPage, path, clip, selector, etc.)
  */

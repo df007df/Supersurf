@@ -110,7 +110,7 @@ class ExtensionBridge {
                     buildTimestamp: null,
                     pingInterval: null,
                     inflight: new Map(),
-                    keepBrowserOnSessionEnd: true,
+                    keepBrowserOnSessionEnd: false,
                 };
                 // Keep-alive ping every 10s
                 conn.pingInterval = setInterval(() => {

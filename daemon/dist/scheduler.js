@@ -9,7 +9,7 @@
  * @module scheduler
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RequestScheduler = void 0;
+exports.RequestScheduler = exports.TAB_SCOPED_METHODS = void 0;
 const debugLog = (...args) => {
     const logger = global.DAEMON_LOGGER;
     if (logger)
@@ -21,12 +21,13 @@ const debugLog = (...args) => {
 const TAB_CLAIM_METHODS = new Set(['selectTab', 'createTab']);
 const TAB_RELEASE_METHODS = new Set(['closeTab']);
 // Methods where we need to ensure the correct tab is active before executing
-const TAB_SCOPED_METHODS = new Set([
+exports.TAB_SCOPED_METHODS = new Set([
     'navigate', 'snapshot', 'evaluate', 'screenshot',
     'consoleMessages', 'networkRequests', 'clearNetwork',
     'performanceMetrics', 'waitForReady', 'capturePageState',
     'forwardCDPCommand', 'window', 'dialog',
     'listExtensions', 'secure_fill',
+    'browseStreamStart', 'browseStreamOffer',
 ]);
 /**
  * Round-robin request scheduler with tab ownership and auto context-switching.
@@ -161,7 +162,7 @@ class RequestScheduler {
             const profileId = this.sessions.getProfileId(sessionId);
             const currentTabId = this.getCurrentTabId(profileId);
             // Auto context-switch
-            if (TAB_SCOPED_METHODS.has(method) || (!TAB_CLAIM_METHODS.has(method) && !TAB_RELEASE_METHODS.has(method) && method !== 'getTabs')) {
+            if (exports.TAB_SCOPED_METHODS.has(method) || (!TAB_CLAIM_METHODS.has(method) && !TAB_RELEASE_METHODS.has(method) && method !== 'getTabs')) {
                 const sessionTabId = this.sessions.getAttachedTabId(sessionId);
                 if (sessionTabId !== null && sessionTabId !== currentTabId) {
                     debugLog(`Context-switch: tab ${currentTabId} -> ${sessionTabId} (session="${sessionId}", profile=${profileId || 'unmanaged'})`);

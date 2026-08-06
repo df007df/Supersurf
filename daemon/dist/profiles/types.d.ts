@@ -38,8 +38,8 @@ export interface PooledConnection {
         reject: (e: Error) => void;
     }>;
     /**
-     * When true (default), daemon does not kill this Chromium on last MCP session disconnect.
-     * Idle / shutdown / orphan paths ignore this flag.
+     * When true, daemon does not kill this Chromium on last MCP session disconnect.
+     * Default false (opt-in). Idle / shutdown / orphan paths ignore this flag.
      */
     keepBrowserOnSessionEnd: boolean;
 }

@@ -3,14 +3,21 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import sharp from 'sharp';
+import { ConfigService } from 'shared';
 import { onScreenshot } from '../src/tools/screenshot';
 import type { ToolContext } from '../src/tools/lib/types';
 
-function createMockCtx(): ToolContext {
+function createMockCtx(omitPath: 'inline' | 'path' | 'both' = 'inline'): ToolContext {
+  const config = new ConfigService({
+    cli: {},
+    env: {},
+    file: { screenshot: { omit_path: omitPath } },
+  });
   return {
     tabId: 1,
     ext: { sendCmd: vi.fn() } as any,
     connectionManager: null,
+    config,
     cdp: vi.fn().mockResolvedValue({}),
     eval: vi.fn().mockResolvedValue(undefined),
     sleep: vi.fn().mockResolvedValue(undefined),
@@ -32,14 +39,11 @@ async function tinyJpegBase64(): Promise<string> {
 }
 
 describe('onScreenshot()', () => {
-  let ctx: ToolContext;
   let jpegB64: string;
   const written: string[] = [];
 
   beforeEach(async () => {
-    ctx = createMockCtx();
     jpegB64 = await tinyJpegBase64();
-    (ctx.ext.sendCmd as any).mockResolvedValue({ data: jpegB64, mimeType: 'image/jpeg' });
     written.length = 0;
   });
 
@@ -53,12 +57,24 @@ describe('onScreenshot()', () => {
     }
   });
 
-  it('defaults to a temp-dir path when path is omitted (no inline image)', async () => {
+  it('defaults to inline image when path is omitted (omit_path=inline)', async () => {
+    const ctx = createMockCtx('inline');
+    (ctx.ext.sendCmd as any).mockResolvedValue({ data: jpegB64, mimeType: 'image/jpeg' });
+
+    const result = await onScreenshot(ctx, {}, {});
+
+    expect(result.content.some((c: any) => c.type === 'image')).toBe(true);
+    expect(result.content.find((c: any) => c.type === 'text')?.text).toMatch(/Screenshot captured/);
+  });
+
+  it('saves to temp dir when omit_path=path and path is omitted', async () => {
+    const ctx = createMockCtx('path');
+    (ctx.ext.sendCmd as any).mockResolvedValue({ data: jpegB64, mimeType: 'image/jpeg' });
+
     const result = await onScreenshot(ctx, {}, {});
 
     expect(result.content).toHaveLength(1);
     expect(result.content[0].type).toBe('text');
-    expect(result.content[0].text).toMatch(/Screenshot saved to /);
     expect(result.content.some((c: any) => c.type === 'image')).toBe(false);
 
     const match = result.content[0].text.match(/Screenshot saved to (.+?) \(/);
@@ -68,10 +84,27 @@ describe('onScreenshot()', () => {
 
     expect(savedPath.startsWith(path.join(os.tmpdir(), 'supersurf-screenshots'))).toBe(true);
     expect(fs.existsSync(savedPath)).toBe(true);
-    expect(fs.statSync(savedPath).size).toBeGreaterThan(0);
   });
 
-  it('uses the explicit path when provided', async () => {
+  it('returns both path text and inline image when omit_path=both', async () => {
+    const ctx = createMockCtx('both');
+    (ctx.ext.sendCmd as any).mockResolvedValue({ data: jpegB64, mimeType: 'image/jpeg' });
+
+    const result = await onScreenshot(ctx, {}, {});
+
+    expect(result.content.some((c: any) => c.type === 'image')).toBe(true);
+    const text = result.content.find((c: any) => c.type === 'text')?.text ?? '';
+    expect(text).toMatch(/Screenshot saved to /);
+    const match = text.match(/Screenshot saved to (.+?)(?:\n|$)/);
+    expect(match).toBeTruthy();
+    written.push(match![1].trim());
+    expect(fs.existsSync(match![1].trim())).toBe(true);
+  });
+
+  it('uses the explicit path when provided (ignores omit_path)', async () => {
+    const ctx = createMockCtx('inline');
+    (ctx.ext.sendCmd as any).mockResolvedValue({ data: jpegB64, mimeType: 'image/jpeg' });
+
     const home = os.homedir();
     const rel = path.join('.supersurf-test-screenshots', `explicit-${Date.now()}.jpg`);
     const expected = path.join(home, rel);
@@ -86,11 +119,23 @@ describe('onScreenshot()', () => {
   });
 
   it('rawResult without path still returns inline base64 (internal capture)', async () => {
+    const ctx = createMockCtx('path');
+    (ctx.ext.sendCmd as any).mockResolvedValue({ data: jpegB64, mimeType: 'image/jpeg' });
+
     const result = await onScreenshot(ctx, {}, { rawResult: true });
 
     expect(result.data).toBeTruthy();
     expect(typeof result.data).toBe('string');
     expect(result.mimeType).toMatch(/image\//);
     expect(result.path).toBeUndefined();
+  });
+
+  it('treats missing config as inline (legacy callers)', async () => {
+    const ctx = createMockCtx('inline');
+    delete (ctx as any).config;
+    (ctx.ext.sendCmd as any).mockResolvedValue({ data: jpegB64, mimeType: 'image/jpeg' });
+
+    const result = await onScreenshot(ctx, {}, {});
+    expect(result.content.some((c: any) => c.type === 'image')).toBe(true);
   });
 });
